@@ -108,7 +108,8 @@ public:
     int setPeakPerformance(bool enabled);
     int setPeakPerformanceTimer(TimerDurations duration);
 
-    int getBattery();
+    char getBatteryPercentage();
+    short getBatteryVoltage();
 };
 
 #endif

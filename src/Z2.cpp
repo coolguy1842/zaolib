@@ -243,7 +243,7 @@ int Z2::setPeakPerformanceTimer(TimerDurations duration) {
 }
 
 
-int Z2::getBattery() {
+char Z2::getBatteryPercentage() {
     std::vector<unsigned char> buf(17);
     int ret = sendPacket(initialPacket);
     if(ret < 0) return ret;
@@ -266,4 +266,24 @@ int Z2::getBattery() {
     hid_read(device, buf.data(), buf.size());
 
     return (int)buf[6];
+}
+
+short Z2::getBatteryVoltage() {
+    std::vector<unsigned char> buf(17);
+    int ret = sendPacket(initialPacket);
+    if(ret < 0) return ret;
+
+    hid_read(device, buf.data(), buf.size());
+
+    ret = sendPacket({
+        0x08, BatteryLevel, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x49
+    });
+
+    if(ret < 0) {
+        return ret;
+    }
+
+    hid_read(device, buf.data(), buf.size());
+    return (short)(buf[8] << 8) + buf[9];
 }
