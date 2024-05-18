@@ -8,6 +8,12 @@
 #include <cmath>
 
 class Z2 : public Device {
+public:
+    enum ConnectType {
+        WIRED,
+        WIFI
+    };
+
 private:
     enum UsbCommandID {
 		EncryptionData = 1,
@@ -59,6 +65,14 @@ private:
         RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, 4000
     };
 
+
+    static unsigned int getPID(ConnectType connectType) {
+        switch(connectType) {
+        case ConnectType::WIRED: return 0xF526;
+        default: return 0xF527;
+        }
+    }
+
 public:    
     enum TimerDurations {
         SECONDS_30 = 0x03,
@@ -79,9 +93,8 @@ public:
         FLICKER
     };
 
-    // wired is PID 0xF526
-    // Z2() : Device(0x3554, 0xF526, 0xff02, 0x0002, []() -> void {}) {
-    Z2() : Device(0x3554, 0xF527, 0xff02, 0x0002, []() -> void {}) {}
+    // wired is PID 0xF526 wireless(2.4GHz) is PID 0xF527 not sure about bluetooth
+    Z2(ConnectType connectType) : Device(0x3554, getPID(connectType), 0xff02, 0x0002, []() -> void {}) {}
 
     int setDPIProfile(unsigned char profile);
     int setDPIProfilesCount(unsigned char count);
@@ -109,7 +122,7 @@ public:
     int setPeakPerformanceTimer(TimerDurations duration);
 
     char getBatteryPercentage();
-    short getBatteryVoltage();
+    short getBatteryCharge();
 };
 
 #endif

@@ -243,32 +243,17 @@ int Z2::setPeakPerformanceTimer(TimerDurations duration) {
 }
 
 
-char Z2::getBatteryPercentage() {
-    std::vector<unsigned char> buf(17);
-    int ret = sendPacket(initialPacket);
-    if(ret < 0) return ret;
-
-    hid_read(device, buf.data(), buf.size());
-
-    // TODO: 100 for some reason on zaopin software must find why
-    //  08 04 00 00 00 02 5F 00 10 1A 00 00 00 00 00 00
-    //  BE
-
-    ret = sendPacket({
-        0x08, BatteryLevel, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x49
-    });
-
-    if(ret < 0) {
-        return ret;
-    }
-
-    hid_read(device, buf.data(), buf.size());
-
-    return (int)buf[6];
+template<typename T>
+T map(T x, T in_min, T in_max, T out_min, T out_max) {
+    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
-short Z2::getBatteryVoltage() {
+char Z2::getBatteryPercentage() {
+    // untested but might work
+    return map((int)getBatteryCharge(), 3200, 0x101A, 0, 100);
+}
+
+short Z2::getBatteryCharge() {
     std::vector<unsigned char> buf(17);
     int ret = sendPacket(initialPacket);
     if(ret < 0) return ret;
