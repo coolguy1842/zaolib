@@ -8,12 +8,6 @@
 #include <cmath>
 
 class Z2 : public Device {
-public:
-    enum ConnectType {
-        WIRED,
-        WIFI
-    };
-
 private:
     enum UsbCommandID {
 		EncryptionData = 1,
@@ -65,6 +59,11 @@ private:
         RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, 4000
     };
 
+public:
+    enum ConnectType {
+        WIRED,
+        WIFI
+    };
 
     static unsigned int getPID(ConnectType connectType) {
         switch(connectType) {
@@ -73,7 +72,7 @@ private:
         }
     }
 
-public:    
+
     enum TimerDurations {
         SECONDS_30 = 0x03,
         MINUTES_1 = 0x06,
@@ -95,6 +94,7 @@ public:
 
     // wired is PID 0xF526 wireless(2.4GHz) is PID 0xF527 not sure about bluetooth
     Z2(ConnectType connectType) : Device(0x3554, getPID(connectType), 0xff02, 0x0002, []() -> void {}) {}
+    Z2(unsigned int PID) : Device(0x3554, PID, 0xff02, 0x0002, []() -> void {}) {}
 
     int setDPIProfile(unsigned char profile);
     int setDPIProfilesCount(unsigned char count);
@@ -124,5 +124,9 @@ public:
     char getBatteryPercentage();
     short getBatteryCharge();
 };
+
+
+// no way to pick between multiple
+Z2* findZ2();
 
 #endif

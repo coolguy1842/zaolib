@@ -272,3 +272,17 @@ short Z2::getBatteryCharge() {
     hid_read(device, buf.data(), buf.size());
     return (short)(buf[8] << 8) + buf[9];
 }
+
+
+Z2* findZ2() {
+    hid_device_info* devices = hid_enumerate(0x3554, 0);
+    
+    if(devices) {
+        unsigned int PID = devices->product_id;
+        hid_free_enumeration(devices);
+
+        return new Z2(PID);
+    }
+
+    return nullptr;
+}
