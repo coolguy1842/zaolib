@@ -1,5 +1,43 @@
 #include "./Z2.hpp"
 
+template<typename T>
+T map(T x, T in_min, T in_max, T out_min, T out_max) {
+    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
+void printBytes(std::vector<unsigned char> bytes) {
+    for(unsigned char byte : bytes) {
+        printf("0x%02X ", byte);
+    }
+
+    printf("\n");
+}
+
+
+std::vector<unsigned char> Z2::getFlashData(unsigned char commandID) {
+    std::vector<unsigned char> buf(17);
+    int ret = sendPacket(initialPacket);
+    if(ret < 0) { };
+
+    hid_read(device, buf.data(), buf.size());
+
+    ret = sendPacket({
+        0x08, UsbCommandID::ReadFlashData, 0x00, 0x00, commandID, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        (unsigned char)(0x3B - commandID)
+    });
+
+    if(ret < 0) {
+        return { };
+    }
+
+    hid_read(device, buf.data(), buf.size());
+
+    std::vector<unsigned char> out(10);
+    memmove(out.data(), buf.data() + 6, 10);
+    return out;
+}
+
+
 int Z2::setDPIProfile(unsigned char profile) {
     int ret = sendPacket(initialPacket);
     if(ret < 0) return ret;
@@ -26,28 +64,19 @@ int Z2::setProfileDPI(unsigned char profile, unsigned int DPI) {
     if(DPI > 26000) return -2;
     else if(DPI <= 0) return -3;
 
-    unsigned char firstByte = std::ceil(DPI / 50.0f) - 1;
-    unsigned char secondByte = 0x55 - (firstByte * 2);
-    unsigned char overflowedByte = 0x00;
-
-    // TODO: theres probably a better way to do this
-    if(DPI > 25600) {
-        overflowedByte = 0x88;
-
-        secondByte = 0xCD - (firstByte * 2);
-    }
-    else if(DPI > 12800) {
-        overflowedByte = 0x44;
-
-        secondByte = 0x11 - (firstByte * 2);
-    }
-
     int ret = sendPacket(initialPacket);
     if(ret < 0) return ret;
 
+    const unsigned int scaledDPI = std::ceil(DPI / 50.0f) - 1;
+    const unsigned char overflowByte = 0x44 * (unsigned char)std::floor(scaledDPI / 256.0f);
+
+    const unsigned char firstByte = (unsigned char)scaledDPI;
+    const unsigned char secondByte = (0x55 - overflowByte) - (firstByte * 2);
+
+    const unsigned char profileScaled = profile * 4;
     return sendPacket({
-        0x08, WriteFlashData, 0x00, 0x00, (unsigned char)(0x0C + (profile * 4)), 0x04, firstByte, firstByte, overflowedByte, secondByte, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        (unsigned char)(0xE1 - (profile * 4))
+        0x08, WriteFlashData, 0x00, 0x00, (unsigned char)(0x0C + profileScaled), 0x04, firstByte, firstByte, overflowByte, secondByte, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        (unsigned char)(0xE1 - profileScaled)
     });
 }
 
@@ -63,6 +92,7 @@ int Z2::setProfileRGBA(unsigned char profile, unsigned char red, unsigned char g
 
     return sendPacket(data);
 }
+
 
 int Z2::setDPILightEffect(DPILightEffect lightEffect) {
     int ret = sendPacket(initialPacket);
@@ -115,6 +145,7 @@ int Z2::setDPILightFlickerSpeed(unsigned char speed) {
     });
 }
 
+
 int Z2::setMotionSync(bool enabled) {
     int ret = sendPacket(initialPacket);
     if(ret < 0) return ret;
@@ -145,6 +176,7 @@ int Z2::setRippleControl(bool enabled) {
     });
 }
 
+
 int Z2::setSensorLOD(unsigned char mm) {
     if(mm < 1) return -2;
     else if(mm > 2) return -3;
@@ -168,25 +200,23 @@ int Z2::setSensorHighPower(bool enabled) {
     });
 }
 
-int Z2::setReportRate(unsigned int rate) {
-    unsigned int max = std::numeric_limits<unsigned int>::max();
-    if(rate >= max) return -2;
-
-    auto it = std::find(rates.begin(), rates.end(), rate);
-    if(it == rates.end()) {
-        return -2;
-    }
-
-    ptrdiff_t index = std::distance(rates.begin(), it);
-
+int Z2::setReportRate(ReportRate rate) {
     int ret = sendPacket(initialPacket);
     if(ret < 0) return ret;
 
+    if(isWired) {
+        switch (rate) {
+        case ReportRate::R_2000: case ReportRate::R_4000: return -2;
+        default: break;
+        }
+    }
+
     return sendPacket({
-        0x08, WriteFlashData, 0x00, 0x00, 0x00, 0x02, (unsigned char)index, (unsigned char)(0x55 - (unsigned char)index), 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x08, WriteFlashData, 0x00, 0x00, 0x00, 0x02, (unsigned char)rate, (unsigned char)(0x55 - (unsigned char)rate), 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0xEF
     });
 }
+
 
 int Z2::setLongDistance(bool enabled) {
     int ret = sendPacket(initialPacket);
@@ -207,7 +237,6 @@ int Z2::setLongDistance(bool enabled) {
 
     return ret;
 }
-
 
 int Z2::setPeakPerformance(bool enabled) {
     int ret = sendPacket(initialPacket);
@@ -243,14 +272,31 @@ int Z2::setPeakPerformanceTimer(TimerDurations duration) {
 }
 
 
-template<typename T>
-T map(T x, T in_min, T in_max, T out_min, T out_max) {
-    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+int Z2::getProfile() {
+    auto data = getFlashData(0x04);
+    if(data.size() <= 0) return -1;
+    
+    return data[0];
 }
 
-char Z2::getBatteryPercentage() {
+int Z2::getProfileCount() {
+    auto data = getFlashData(0x02);
+    if(data.size() <= 0) return -1;
+    
+    return data[0];
+}
+
+Z2::ReportRate Z2::getReportRate() {
+    auto data = getFlashData(0x00);
+    if(data.size() <= 0) return Z2::ReportRate::R_INVALID;
+    
+    return (ReportRate)data[0];
+}
+
+
+int Z2::getBatteryPercentage() {
     // untested but might work
-    return map((int)getBatteryCharge(), 3200, 0x101A, 0, 100);
+    return map((int)getBatteryCharge(), 1410, 4200, 0, 100);
 }
 
 short Z2::getBatteryCharge() {

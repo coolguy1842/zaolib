@@ -9,6 +9,8 @@
 
 class Z2 : public Device {
 private:
+    bool isWired;
+
     enum UsbCommandID {
 		EncryptionData = 1,
 		PCDriverStatus,
@@ -48,17 +50,7 @@ private:
         0x4A
     };
 
-
-    const unsigned int RESERVED = std::numeric_limits<unsigned int>::max();
-    const std::vector<unsigned int> rates = {
-        RESERVED, 1000,
-        500,
-        RESERVED, 250,
-        RESERVED, RESERVED, RESERVED, 125,
-        RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, 2000,
-        RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, RESERVED, 4000
-    };
-
+    std::vector<unsigned char> getFlashData(unsigned char commandID);
 public:
     enum ConnectType {
         WIRED,
@@ -92,9 +84,38 @@ public:
         FLICKER
     };
 
+    enum ReportRate {
+        R_INVALID = -1,
+        R_1000 = 1,
+		R_500 = 2,
+		R_250 = 4,
+		R_125 = 8,
+		R_2000 = 16,
+		R_4000 = 32
+    };
+
     // wired is PID 0xF526 wireless(2.4GHz) is PID 0xF527 not sure about bluetooth
-    Z2(ConnectType connectType) : Device(0x3554, getPID(connectType), 0xff02, 0x0002, []() -> void {}) {}
-    Z2(unsigned int PID) : Device(0x3554, PID, 0xff02, 0x0002, []() -> void {}) {}
+    Z2(ConnectType connectType) : Device(0x3554, getPID(connectType), 0xff02, 0x0002, []() -> void {}) {
+        switch (connectType) {
+        case ConnectType::WIFI:
+            isWired = false;
+            break;
+        default: // assuming bluetooth will be 1khz max
+            isWired = true;
+            break;
+        }
+    }
+
+    Z2(unsigned int PID) : Device(0x3554, PID, 0xff02, 0x0002, []() -> void {}) {
+        switch (PID) {
+        case 0xF526:
+            isWired = false;
+            break;
+        default: // assuming bluetooth will be 1khz max
+            isWired = true;
+            break;
+        }
+    }
 
     int setDPIProfile(unsigned char profile);
     int setDPIProfilesCount(unsigned char count);
@@ -114,14 +135,19 @@ public:
 
     int setSensorLOD(unsigned char mm);
     int setSensorHighPower(bool enabled);
-    int setReportRate(unsigned int rate);
+    int setReportRate(ReportRate rate);
 
     int setLongDistance(bool enabled);
 
     int setPeakPerformance(bool enabled);
     int setPeakPerformanceTimer(TimerDurations duration);
 
-    char getBatteryPercentage();
+
+    int getProfile();
+    int getProfileCount();
+    ReportRate getReportRate();
+
+    int getBatteryPercentage();
     short getBatteryCharge();
 };
 
