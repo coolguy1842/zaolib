@@ -222,18 +222,10 @@ int Z2::setLongDistance(bool enabled) {
     int ret = sendPacket(initialPacket);
     if(ret < 0) return ret;
     
-    if(enabled) {
-        ret = sendPacket({
-            0x08, SetLongRangeMode, 0x00, 0x00, 0x00, 0x0A, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x2C
-        });
-    }
-    else {
-        ret = sendPacket({
-            0x08, SetLongRangeMode, 0x00, 0x00, 0x00, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x2D
-        });
-    }
+    ret = sendPacket({
+        0x08, SetLongRangeMode, 0x00, 0x00, 0x00, 0x0A, enabled, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        (unsigned char)(0x2C + enabled)
+    });
 
     return ret;
 }
@@ -368,31 +360,11 @@ int Z2::getBatteryPercentage() {
     // 0x08 0x04 0x00 0x00 0x00 0x02 0x4B 0x01 0x0F 0xA9 0x00 0x00 0x00 0x00 0x00 0x00 0x43
 
 
-    // untested but might work
-    return map((int)getBatteryCharge(), 0x0C7A, 0x1072, 0, 100);
-
-    std::vector<unsigned char> buf(17);
-    int ret = sendPacket(initialPacket);
-    if(ret < 0) return ret;
-
-    hid_read(device, buf.data(), buf.size());
-
-    ret = sendPacket({
-        0x08, BatteryLevel, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x49
-    });
-
-    if(ret < 0) {
-        return ret;
-    }
-
-    hid_read(device, buf.data(), buf.size());
-    printBytes(buf);
-
-    return buf[6];
+    // needs calibration but i think itll work
+    return map((int)getBatteryCharge(), 0x0C7ABC, 0x106B61, 0, 100);
 }
 
-short Z2::getBatteryCharge() {
+int Z2::getBatteryCharge() {
     std::vector<unsigned char> buf(17);
     int ret = sendPacket(initialPacket);
     if(ret < 0) return ret;
@@ -410,7 +382,7 @@ short Z2::getBatteryCharge() {
 
     hid_read(device, buf.data(), buf.size());
     printBytes(buf);
-    return (short)(buf[8] << 8) + buf[9];
+    return ((int)(buf[8] << 16) + ((int)buf[9] << 8)) + (int)(buf[16]);
 }
 
 

@@ -148,7 +148,7 @@ public:
     ReportRate getReportRate();
 
     int getBatteryPercentage();
-    short getBatteryCharge();
+    int getBatteryCharge();
 };
 
 
